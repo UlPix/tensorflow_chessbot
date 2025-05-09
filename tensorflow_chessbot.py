@@ -142,6 +142,40 @@ class ChessboardPredictor(object):
   def close(self):
     print("Closing session.")
     self.sess.close()
+    
+def predict_fen(filepath=None, url=None, unflip=False, active='w'):
+    if filepath:
+        img = helper_image_loading.loadImageFromPath(filepath)
+    else:
+        img, url = helper_image_loading.loadImageFromURL(url)
+
+    if img is None:
+        raise Exception(f"Could not load image from: {filepath or url}")
+
+    tiles, corners = chessboard_finder.findGrayscaleTilesInImage(img)
+    if tiles is None:
+        raise Exception("Could not find chessboard in image")
+
+    predictor = ChessboardPredictor()
+    fen, tile_certainties = predictor.getPrediction(tiles)
+    predictor.close()
+
+    if unflip:
+        fen = unflipFEN(fen)
+
+    short_fen = shortenFEN(fen)
+    certainty = tile_certainties.min()
+
+    # Return FEN and certainty
+    return f"{short_fen} {active} - - 0 1", certainty
+
+def get_model_path():
+    # Get the directory where this script is located
+    print("HELLOOO")
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    # Join with the relative path to 'saved_models/frozen_graph.pb'
+    model_path = os.path.join(script_dir, 'saved_models', 'frozen_graph.pb')
+    return model_path
 
 ###########################################################
 # MAIN CLI
@@ -197,6 +231,8 @@ def main(args):
   active = args.active
   print("---\nPredicted FEN:\n%s %s - - 0 1" % (short_fen, active))
   print("Final Certainty: %.1f%%" % (certainty*100))
+
+  return short_fen, certainty
 
 if __name__ == '__main__':
   np.set_printoptions(suppress=True, precision=3)
